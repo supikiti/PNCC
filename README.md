@@ -19,4 +19,4 @@ pip install -r requirements.txt
 
 ## Author
 
-[tcnksm](https://github.com/tcnksm)
+[supikiti](https://github.com/supikiti)
