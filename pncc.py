@@ -111,7 +111,7 @@ def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
     pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
     stft_pre_emphasis_signal = np.abs(stft(pre_emphasis_signal,
                                            n_fft=n_fft, window=window)) ** 2
-    mel_filter = np.abs(filters.mel(sr
+    mel_filter = np.abs(filters.mel(16000, n_fft = n_fft, n_mels=n_mels)) ** 2
     power_stft_pre_signal = np.dot(stft_pre_emphasis_signal.T, mel_filter.T)
     q_power_stft_pre_signal = np.zeros(shape=(power_stft_pre_signal.shape[0],
                                               power_stft_pre_signal.shape[1]))
