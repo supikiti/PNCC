@@ -1,6 +1,7 @@
 # PNCC implementation in Python
-Based on http://www.cs.cmu.edu/~robust/Papers/OnlinePNCC_V25.pdf
-
+Based on 
+- http://www.cs.cmu.edu/~robust/Papers/OnlinePNCC_V25.pdf
+- https://www.eurasip.org/Proceedings/Eusipco/Eusipco2015/papers/1570104069.pdf
 
 
 ## Installation:
