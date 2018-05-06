@@ -106,15 +106,13 @@ def power_function_nonlinearity(u_, n=15):
 
 
 def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
-         n_mels=40, n_pncc=13):
+         n_mels=40, n_pncc=13, power=2):
 
     pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
     stft_pre_emphasis_signal = np.abs(stft(pre_emphasis_signal,
-                                           n_fft=n_fft, window=window)) ** 2
-    mel_filter = np.abs(filters.mel(16000, n_fft = n_fft, n_mels=n_mels)) ** 2
+                                           n_fft=n_fft, window=window)) ** power
+    mel_filter = np.abs(filters.mel(sr, n_fft = n_fft, n_mels=n_mels)) ** power
     power_stft_pre_signal = np.dot(stft_pre_emphasis_signal.T, mel_filter.T)
-    q_power_stft_pre_signal = np.zeros(shape=(power_stft_pre_signal.shape[0],
-                                              power_stft_pre_signal.shape[1]))
     q_ = medium_time_power_calculation(power_stft_pre_signal)
     q_le = asymmetric_lawpass_filtering(q_, 0.999, 0.5)
     pre_q_0 = q_ - q_le
@@ -124,11 +122,10 @@ def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
     r_sp = after_temporal_masking(q_th, q_f)
     r_ = switch_excitation_or_non_excitation(r_sp=r_sp,
                                              q_f=q_f, q_le=q_le,
-                                             q_power_stft_pre_signal=q_power_stft_pre_signal)
+                                             q_power_stft_pre_signal=q_)
     s_ = weight_smoothing(r_=r_, q_=q_)
     t_ = time_frequency_normalization(p_=power_stft_pre_signal, s_=s_)
     u_ = mean_power_normalization(t_, r_)
     v_ = power_function_nonlinearity(u_)
-    n_pncc = n_pncc
-    dct_v = np.dot(filters.dct(n_mfcc, v_.shape[1]), power_to_db(v_.T))
+    dct_v = np.dot(filters.dct(n_mfcc, v_.shape[1]), v_.T)
     return dct_v.T
