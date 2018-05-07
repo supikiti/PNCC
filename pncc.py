@@ -127,7 +127,7 @@ def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
     t_ = time_frequency_normalization(p_=power_stft_pre_signal, s_=s_)
     u_ = mean_power_normalization(t_, r_)
     v_ = power_function_nonlinearity(u_)
-    dct_v = np.dot(filters.dct(n_mfcc, v_.shape[1]), v_.T)
+    dct_v = np.dot(filters.dct(n_pncc, v_.shape[1]), v_.T)
     if dct:
         return dct_v.T
     else:
