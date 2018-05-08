@@ -3,6 +3,8 @@ Based on
 - http://www.cs.cmu.edu/~robust/Papers/OnlinePNCC_V25.pdf
 - https://www.eurasip.org/Proceedings/Eusipco/Eusipco2015/papers/1570104069.pdf
 
+put a slide about PNCC
+- https://www.slideshare.net/ssuser3f97dd/dl-hucks-pncc
 
 ## Installation:
 Clone and install requirements.
