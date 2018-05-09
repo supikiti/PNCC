@@ -7,7 +7,6 @@ from librosa.core import stft
 from librosa import filters
 
 
-
 def medium_time_power_calculation(p_, M=2):
     q_ = np.zeros(shape=(p_.shape[0], p_.shape[1]))
     p_ = np.pad(p_, [(M, M), (0, 0)], 'constant')
