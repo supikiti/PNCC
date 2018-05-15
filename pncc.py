@@ -106,7 +106,7 @@ def power_function_nonlinearity(u_, n=15):
 
 
 def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
-         n_mels=40, n_pncc=13, power=2, dct=True):
+         n_mels=40, n_pncc=13, weight_N=4, power=2, dct=True):
 
     pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
     stft_pre_emphasis_signal = np.abs(stft(pre_emphasis_signal,
@@ -123,7 +123,7 @@ def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
     r_ = switch_excitation_or_non_excitation(r_sp=r_sp,
                                              q_f=q_f, q_le=q_le,
                                              q_power_stft_pre_signal=q_)
-    s_ = weight_smoothing(r_=r_, q_=q_)
+    s_ = weight_smoothing(r_=r_, q_=q_, N=weight_N)
     t_ = time_frequency_normalization(p_=power_stft_pre_signal, s_=s_)
     u_ = mean_power_normalization(t_, r_)
     v_ = power_function_nonlinearity(u_)
