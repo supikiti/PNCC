@@ -15,6 +15,13 @@ cd PNCC
 pip install -r requirements.txt
 ```
 
+```bash
+python train.py
+```
+
+```bash
+python test.py sample.wav
+```
 
 ## Licence
 
