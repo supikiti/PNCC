@@ -20,7 +20,7 @@ python train.py
 ```
 
 ```bash
-python test.py sample.wav
+python predict.py sample.wav
 ```
 
 `csj_parser.py`のオプションは以下の通りです。
