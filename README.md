@@ -23,6 +23,17 @@ python train.py
 python test.py sample.wav
 ```
 
+`csj_parser.py`のオプションは以下の通りです。
+
+引数 | 説明
+-------------|------------
+--lstm-node, -l | LSTMのノード数(デフォルト32)
+--recurrent-dropout, -d | 再帰の線形変換においてdropするユニットの割合(デフォルト0.5)
+--epochs, -e | モデルを訓練するエポック数(デフォルト10)
+--optimizer-method, -r | 用いる最適化アルゴリズム(デフォルトadam)
+--voice-data, -f | 訓練用データ(trainデータ)と検証データ(testデータ)が存在するディレクトリへのパス(デフォルト./corpus/)
+
+
 ## Licence
 
 [MIT](https://github.com/tcnksm/tool/blob/master/LICENCE)
