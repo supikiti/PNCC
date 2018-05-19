@@ -16,7 +16,10 @@ pip install -r requirements.txt
 ```
 
 ```bash
-python train.py
+python train.py --lstm-node 32 --recurrent-dropout 0.5 --epochs 10 --optimizer-method adam
+```
+```bash
+python train.py -l 32 -r 0.5 -e 10 -r adam 
 ```
 
 ```bash
