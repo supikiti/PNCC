@@ -16,7 +16,7 @@ pip install -r requirements.txt
 ```
 
 ```bash
-python train.py --lstm-node 32 --recurrent-dropout 0.5 --epochs 10 --optimizer-method adam
+$ python train.py --lstm-node 32 --recurrent-dropout 0.5 --epochs 10 --optimizer-method adam
 ```
 ```bash
 $ pip install keras 
@@ -29,7 +29,7 @@ $ pip install soundfile
 ```
 
 ```bash
-python predict.py sample.wav
+$ python predict.py sample.wav
 ```
 
 `csj_parser.py`のオプションは以下の通りです。
