@@ -1,123 +1,173 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy
-import librosa
-from librosa.core import power_to_db
 from librosa.core import stft
 from librosa import filters
 
 
-def medium_time_power_calculation(p_, M=2):
-    q_ = np.zeros(shape=(p_.shape[0], p_.shape[1]))
-    p_ = np.pad(p_, [(M,M), (0, 0)], 'constant')
+def medium_time_power_calculation(power_stft_signal, M=2):
+    medium_time_power = np.zeros(
+        shape=(power_stft_signal.shape[0], power_stft_signal.shape[1]))
+    power_stft_signal = np.pad(power_stft_signal, [(M, M), (0, 0)], 'constant')
 
-    for i in range(q_.shape[0]):
-        for j in range(q_.shape[1]):
-            q_[i, j] = sum([1/(2*M + 1) * p_[i + k - M, j] for k in range(5)])
-    return q_
+    for i in range(medium_time_power.shape[0]):
+        for j in range(medium_time_power.shape[1]):
+            medium_time_power[i, j] = sum(
+                [1/(2*M + 1) * power_stft_signal[i + k - M, j]
+                 for k in range(5)])
+    return medium_time_power
 
-def asymmetric_lawpass_filtering(q_in, lm_a=0.999, lm_b=0.5):
-    q_out = np.zeros(shape=(q_in.shape[0], q_in.shape[1]))
-    q_out[0, :] = 0.9 * q_in[0, :]
-    for m in range(q_out.shape[0]):
-        for l in range(q_out.shape[1]):
-            if (q_in[m, l] >= q_out[m-1, l]):
-                q_out[m, l] = lm_a * q_out[m-1, l] + (1 - lm_a) * q_in[m, l]
+
+def asymmetric_lawpass_filtering(rectified_signal, lm_a=0.999, lm_b=0.5):
+    floor_level = np.zeros(
+        shape=(rectified_signal.shape[0], rectified_signal.shape[1]))
+    floor_level[0, :] = 0.9 * rectified_signal[0, :]
+    for m in range(floor_level.shape[0]):
+        for l in range(floor_level.shape[1]):
+            if (rectified_signal[m, l] >= floor_level[m-1, l]):
+                floor_level[m, l] = lm_a * floor_level[m-1, l] + \
+                    (1 - lm_a) * rectified_signal[m, l]
             else:
-                q_out[m, l] = lm_b * q_out[m-1, l] + (1 - lm_b) * q_in[m, l]
-    return q_out
+                floor_level[m, l] = lm_b * floor_level[m-1, l] + \
+                    (1 - lm_b) * rectified_signal[m, l]
+    return floor_level
 
-def halfwave_rectification(pre_q_0, th=0):
-    for m in range(pre_q_0.shape[0]):
-        for l in range(pre_q_0.shape[1]):
-            if (pre_q_0[m, l] < th):
-                pre_q_0[m, l] = 0
-    return pre_q_0
 
-def temporal_masking(q_o, lam_t=0.85, myu_t=0.2):
-    q_th = np.zeros(shape=(q_o.shape[0], q_o.shape[1]))
-    q_p = np.zeros(shape=(q_o.shape[0], q_o.shape[1]))
-    q_th[0, :] = q_o[0, :]
-    for m in range(q_o.shape[0]):
-        for l in range(q_o.shape[1]):
-            q_p[m, l] = max(lam_t * q_p[m-1, l], q_o[m, l])
-            if q_o[m, l] >= lam_t * q_p[m-1, l]:
-                q_th[m, l] = q_o[m, l]
+def halfwave_rectification(subtracted_lower_envelope, th=0):
+    for m in range(subtracted_lower_envelope.shape[0]):
+        for l in range(subtracted_lower_envelope.shape[1]):
+            if (subtracted_lower_envelope[m, l] < th):
+                subtracted_lower_envelope[m, l] = 0
+    return subtracted_lower_envelope
+
+
+def temporal_masking(rectified_signal, lam_t=0.85, myu_t=0.2):
+    temporal_masked_signal = np.zeros(
+        shape=(rectified_signal.shape[0], rectified_signal.shape[1]))
+    online_peak_power = np.zeros(
+        shape=(rectified_signal.shape[0], rectified_signal.shape[1]))
+    temporal_masked_signal[0, :] = rectified_signal[0, :]
+    for m in range(rectified_signal.shape[0]):
+        for l in range(rectified_signal.shape[1]):
+            online_peak_power[m, l] = max(
+                lam_t * online_peak_power[m-1, l], rectified_signal[m, l])
+            if rectified_signal[m, l] >= lam_t * online_peak_power[m-1, l]:
+                temporal_masked_signal[m, l] = rectified_signal[m, l]
             else:
-                q_th[m, l] = myu_t * q_p[m-1, l]
+                temporal_masked_signal[m, l] = myu_t * \
+                    online_peak_power[m-1, l]
 
-    return q_th
+    return temporal_masked_signal
 
-def after_temporal_masking(q_th, q_f):
-    r_sp = np.zeros(shape=(q_th.shape[0], q_th.shape[1]))
-    for m in range(q_th.shape[0]):
-        for l in range(q_th.shape[1]):
-            r_sp[m, l] = max(q_th[m, l], q_f[m, l])
-    return r_sp
 
-def switch_excitation_or_non_excitation(r_sp, q_f, q_le,
-                                        q_power_stft_pre_signal,c=2):
-    r_ = np.zeros(shape=(r_sp.shape[0], r_sp.shape[1]))
+def after_temporal_masking(temporal_masked_signal, floor_level):
+    after_tmpmask = np.zeros(
+        shape=(temporal_masked_signal.shape[0],
+               temporal_masked_signal.shape[1]))
+    for m in range(temporal_masked_signal.shape[0]):
+        for l in range(temporal_masked_signal.shape[1]):
+            after_tmpmask[m, l] = max(
+                temporal_masked_signal[m, l], floor_level[m, l])
+    return after_tmpmask
+
+
+def switch_excitation_or_non_excitation(temporal_masked_signal,
+                                        floor_level, lower_envelope,
+                                        medium_time_power, c=2):
+    final_output = np.zeros(
+        shape=(temporal_masked_signal.shape[0],
+               temporal_masked_signal.shape[1]))
     c = 2
-    for m in range(r_sp.shape[0]):
-        for l in range(r_sp.shape[1]):
-            if q_power_stft_pre_signal[m, l] >= c * q_le[m, l]:
-                r_[m, l] = r_sp[m, l]
+    for m in range(temporal_masked_signal.shape[0]):
+        for l in range(temporal_masked_signal.shape[1]):
+            if medium_time_power[m, l] >= c * lower_envelope[m, l]:
+                final_output[m, l] = temporal_masked_signal[m, l]
             else:
-                r_[m, l] = q_f[m, l]
-    return r_
+                final_output[m, l] = floor_level[m, l]
+    return final_output
 
-def weight_smoothing(r_, q_, N=4, L=40):
-    s_ = np.zeros(shape=(r_.shape[0], r_.shape[1]))
-    for m in range(r_.shape[0]):
-        for l in range(r_.shape[1]):
+
+def weight_smoothing(final_output, medium_time_power, N=4, L=40):
+    spectral_weight_smoothing = np.zeros(
+        shape=(final_output.shape[0], final_output.shape[1]))
+    for m in range(final_output.shape[0]):
+        for l in range(final_output.shape[1]):
             l_1 = max(l - N, 1)
             l_2 = min(l + N, L)
-            s_[m, l] = sum([1/(l_2 - l_1 + 1) * (r_[m, k] / max(q_[m, k], 0.0001)) for k in range(l_1, l_2)])
-    return s_
+            spectral_weight_smoothing[m, l] = sum(
+                [1/(l_2 - l_1 + 1) *
+                 (final_output[m, k] / max(medium_time_power[m, k], 0.0001))
+                 for k in range(l_1, l_2)])
+    return spectral_weight_smoothing
 
-def time_frequency_normalization(p_, s_):
-    return p_ * s_
 
-def mean_power_normalization(t_, r_, lam_myu=0.999, L=40, k=1):
-    myu = np.zeros(shape=(t_.shape[0]))
+def time_frequency_normalization(power_stft_signal,
+                                 spectral_weight_smoothing):
+    return power_stft_signal * spectral_weight_smoothing
+
+
+def mean_power_normalization(transfer_function,
+                             final_output, lam_myu=0.999, L=40, k=1):
+    myu = np.zeros(shape=(transfer_function.shape[0]))
     myu[0] = 0.0001
-    u_ = np.zeros(shape=(t_.shape[0], t_.shape[1]))
-    for m in range(1, t_.shape[0]):
-        myu[m] = lam_myu * myu[m - 1] + (1 - lam_myu) / L * sum([t_[m, k] for k in range(0, L-1)])
-    for m in range(r_.shape[0]):
-        u_[m, :] = k * t_[m, :] / myu[m]
+    normalized_power = np.zeros(
+        shape=(transfer_function.shape[0], transfer_function.shape[1]))
+    for m in range(1, transfer_function.shape[0]):
+        myu[m] = lam_myu * myu[m - 1] + \
+            (1 - lam_myu) / L * \
+            sum([transfer_function[m, k] for k in range(0, L-1)])
+    for m in range(final_output.shape[0]):
+        normalized_power[m, :] = k * transfer_function[m, :] / myu[m]
 
-    return u_
+    return normalized_power
 
-def power_function_nonlinearity(u_, n=15):
-    return u_ ** 1/n
+
+def power_function_nonlinearity(normalized_power, n=15):
+    return normalized_power ** 1/n
+
 
 def pncc(audio_wave, n_fft=1024, sr=16000, window="hamming",
-        n_mels=40, n_pncc=13, dct=True):
-    
-    pre_emphasis_signal= scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
+         n_mels=40, n_pncc=13, weight_N=4, power=2, dct=True):
+
+    pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
     stft_pre_emphasis_signal = np.abs(stft(pre_emphasis_signal,
-                                            n_fft=n_fft, window=window)) ** 2
-    mel_filter = np.abs(filters.mel(16000, n_fft = n_fft, n_mels=n_mels)) ** 2
-    power_stft_pre_signal = np.dot(stft_pre_emphasis_signal.T, mel_filter.T)
-    q_power_stft_pre_signal = np.zeros(shape=(power_stft_pre_signal.shape[0],
-                                                power_stft_pre_signal.shape[1]))
-    q_ = medium_time_power_calculation(power_stft_pre_signal)
-    q_le = asymmetric_lawpass_filtering(q_, 0.999, 0.5)
-    pre_q_0 = q_ - q_le
-    q_0 = halfwave_rectification(pre_q_0)
-    q_f = asymmetric_lawpass_filtering(q_0)
-    q_th = temporal_masking(q_0)
-    r_sp = after_temporal_masking(q_th, q_f)
-    r_ = switch_excitation_or_non_excitation(r_sp=r_sp, q_f=q_f, q_le=q_le,
-                    q_power_stft_pre_signal=q_)
-    s_ = weight_smoothing(r_=r_, q_=q_)
-    t_ = time_frequency_normalization(p_=power_stft_pre_signal, s_=s_)
-    u_ = mean_power_normalization(t_, r_)
-    v_ = power_function_nonlinearity(u_)
-    dct_v = np.dot(filters.dct(n_pncc, v_.shape[1]), v_.T)
+                                      n_fft=n_fft, window=window)) ** power
+    mel_filter = np.abs(filters.mel(sr, n_fft=n_fft, n_mels=n_mels)) ** power
+    power_stft_signal = np.dot(stft_pre_emphasis_signal.T, mel_filter.T)
+    medium_time_power = medium_time_power_calculation(power_stft_signal)
+    lower_envelope = asymmetric_lawpass_filtering(
+        medium_time_power, 0.999, 0.5)
+    subtracted_lower_envelope = medium_time_power - lower_envelope
+    rectified_signal = halfwave_rectification(subtracted_lower_envelope)
+    floor_level = asymmetric_lawpass_filtering(rectified_signal)
+    temporal_masked_signal = temporal_masking(rectified_signal)
+    temporal_masked_signal = after_temporal_masking(
+        temporal_masked_signal, floor_level)
+    
+   
+    final_output = switch_excitation_or_non_excitation(
+        temporal_masked_signal=temporal_masked_signal,
+        floor_level=floor_level, lower_envelope=lower_envelope,
+        medium_time_power=medium_time_power)
+    
+    spectral_weight_smoothing = weight_smoothing(
+        final_output=final_output,
+        medium_time_power=medium_time_power, N=weight_N)
+    
+    transfer_function = time_frequency_normalization(
+        power_stft_signal=power_stft_signal,
+        spectral_weight_smoothing=spectral_weight_smoothing)
+    
+    normalized_power = mean_power_normalization(
+        transfer_function, final_output)
+    
+    power_law_nonlinearity = power_function_nonlinearity(normalized_power)
+    
+    print(power_law_nonlinearity)
+    print(power_law_nonlinearity.shape)
+    dct_v = np.dot(filters.dct(
+        n_pncc, power_law_nonlinearity.shape[1]), power_law_nonlinearity.T)
+    print("pncc.py")
     if dct:
-        return dct_v
+        return dct_v.T
     else:
-        return v_.T
+        return power_law_nonlinearity.T
