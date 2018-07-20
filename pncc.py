@@ -104,9 +104,9 @@ def power_function_nonlinearity(normalized_power, n=15):
 def pncc(audio_wave, n_fft=512, sr=16000, winlen=0.020, winstep=0.010,
          n_mels=40, n_pncc=13, weight_N=4, power=2):
 
-    mono_wave = to_mono(audio_wave)
-    pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, mono_wave)
-    stft_pre_emphasis_signal = np.abs(stft(pre_emphasis_signal,
+    pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
+    mono_wave = to_mono(pre_emphasis_signal)
+    stft_pre_emphasis_signal = np.abs(stft(mono_wave,
                                            n_fft=n_fft,
                                            hop_length=int(sr * winstep),
                                            win_length=int(sr * winlen),
