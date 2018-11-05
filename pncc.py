@@ -2,6 +2,7 @@ from librosa.core import stft
 from librosa import filters
 from librosa import to_mono
 import numpy as np
+
 import scipy
 
 
@@ -36,26 +37,20 @@ def halfwave_rectification(subtracted_lower_envelope, th=0):
 
 
 def temporal_masking(rectified_signal, lam_t=0.85, myu_t=0.2):
+	# rectified_signal[m, l]
     temporal_masked_signal = np.zeros_like(rectified_signal)
     online_peak_power = np.zeros_like(rectified_signal)
-    temporal_masked_signal[0, ] = rectified_signal[0, ]
-    for m in range(rectified_signal.shape[0]):
-        online_peak_power[m, :] = np.where(
-            lam_t * online_peak_power[m - 1, :] >= rectified_signal[m, ],
-            lam_t * online_peak_power[m - 1, :],
-            rectified_signal[m, :])
+    temporal_masked_signal[0, :] = rectified_signal[0, ]
+	online_peak_power[0, :] = rectified_signal[0, :]
+    for m in range(1, rectified_signal.shape[0]):
+        online_peak_power[m, :] = np.maximum(lam_t * online_peak_power[m-1, :],
+											rectified_signal[m, :])
         temporal_masked_signal[m, :] = np.where(
             rectified_signal[m, :] >= lam_t * online_peak_power[m - 1, :],
             rectified_signal[m, :],
             myu_t * online_peak_power[m - 1, :])
 
     return temporal_masked_signal
-
-
-def after_temporal_masking(temporal_masked_signal, floor_level):
-    return np.where(temporal_masked_signal > floor_level,
-                    temporal_masked_signal, floor_level)
-
 
 def switch_excitation_or_non_excitation(temporal_masked_signal,
                                         floor_level, lower_envelope,
@@ -64,18 +59,17 @@ def switch_excitation_or_non_excitation(temporal_masked_signal,
                     temporal_masked_signal, floor_level)
 
 
-def weight_smoothing(final_output, medium_time_power, N=4, L=40):
-    spectral_weight_smoothing = np.zeros_like(final_output)
-    for l in range(final_output.shape[1]):
-        l_1 = max(l - N, 1)
-        l_2 = min(l + N, L)
-        spectral_weight_smoothing[:, l] = sum(
-            [1 / (l_2 - l_1 + 1) * (final_output[:, k] / np.where(
-                medium_time_power[:, k] > 0.0001,
-                medium_time_power[:, k],
-                0.0001)) for k in range(l_1, l_2)])
-    return spectral_weight_smoothing
+def weight_smoothing(final_output, medium_time_power, N=4, L=128):
 
+    spectral_weight_smoothing = np.zeros_like(final_output)
+	for m in range(final_output.shape[0]):
+		for l in range(final_output.shape[1]):
+			l_1 = max(l - N, 1)
+			l_2 = min(l + N, L)
+	        spectral_weight_smoothing[m, l] = (1/(l_2 - l_1 + 1)) * \
+	            sum([(final_output[m, l_] / medium_time_power[m, l_])\
+			     for l_ in range(l_1, l_2)])
+    return spectral_weight_smoothing
 
 def time_frequency_normalization(power_stft_signal,
                                  spectral_weight_smoothing):
@@ -91,8 +85,7 @@ def mean_power_normalization(transfer_function,
         myu[m] = lam_myu * myu[m - 1] + \
             (1 - lam_myu) / L * \
             sum([transfer_function[m, s] for s in range(0, L - 1)])
-    for m in range(final_output.shape[0]):
-        normalized_power[m, :] = k * transfer_function[m, :] / myu[m]
+    normalized_power = k * transfer_function / myu[:, None]
 
     return normalized_power
 
@@ -102,41 +95,50 @@ def power_function_nonlinearity(normalized_power, n=15):
 
 
 def pncc(audio_wave, n_fft=512, sr=16000, winlen=0.020, winstep=0.010,
-         n_mels=40, n_pncc=13, weight_N=4, power=2):
+         n_mels=128, n_pncc=13, weight_N=4, power=2):
+
 
     pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
-    mono_wave = to_mono(pre_emphasis_signal)
+    mono_wave = to_mono(pre_emphasis_signal.T)
     stft_pre_emphasis_signal = np.abs(stft(mono_wave,
                                            n_fft=n_fft,
                                            hop_length=int(sr * winstep),
                                            win_length=int(sr * winlen),
                                            window=np.ones(int(sr * winlen)),
                                            center=False)) ** power
+
     mel_filter = np.abs(filters.mel(sr, n_fft=n_fft, n_mels=n_mels)) ** power
     power_stft_signal = np.dot(stft_pre_emphasis_signal.T, mel_filter.T)
+
     medium_time_power = medium_time_power_calculation(power_stft_signal)
+
     lower_envelope = asymmetric_lawpass_filtering(
         medium_time_power, 0.999, 0.5)
 
     subtracted_lower_envelope = medium_time_power - lower_envelope
+
     rectified_signal = halfwave_rectification(subtracted_lower_envelope)
+
     floor_level = asymmetric_lawpass_filtering(rectified_signal)
+
     temporal_masked_signal = temporal_masking(rectified_signal)
-    temporal_masked_signal = after_temporal_masking(
-        temporal_masked_signal, floor_level)
+
     final_output = switch_excitation_or_non_excitation(
         temporal_masked_signal, floor_level, lower_envelope,
         medium_time_power)
+
     spectral_weight_smoothing = weight_smoothing(
-        final_output, medium_time_power, weight_N, L=n_mels)
-    
+        final_output, medium_time_power, L=n_mels)
+
     transfer_function = time_frequency_normalization(
-        power_stft_signal=power_stft_signal,
-        spectral_weight_smoothing=spectral_weight_smoothing)
-    
+        power_stft_signal,
+        spectral_weight_smoothing)
+
     normalized_power = mean_power_normalization(
-        transfer_function, final_output)
+        transfer_function, final_output, L=n_mels)
 
     power_law_nonlinearity = power_function_nonlinearity(normalized_power)
 
-    return power_law_nonlinearity
+    dct = np.dot(power_law_nonlinearity, filters.dct(n_pncc, power_law_nonlinearity.shape[1]).T)
+
+    return dct
