@@ -37,20 +37,21 @@ def halfwave_rectification(subtracted_lower_envelope, th=0):
 
 
 def temporal_masking(rectified_signal, lam_t=0.85, myu_t=0.2):
-	# rectified_signal[m, l]
+        # rectified_signal[m, l]
     temporal_masked_signal = np.zeros_like(rectified_signal)
     online_peak_power = np.zeros_like(rectified_signal)
     temporal_masked_signal[0, :] = rectified_signal[0, ]
-	online_peak_power[0, :] = rectified_signal[0, :]
+    online_peak_power[0, :] = rectified_signal[0, :]
     for m in range(1, rectified_signal.shape[0]):
         online_peak_power[m, :] = np.maximum(lam_t * online_peak_power[m-1, :],
-											rectified_signal[m, :])
+                                             rectified_signal[m, :])
         temporal_masked_signal[m, :] = np.where(
             rectified_signal[m, :] >= lam_t * online_peak_power[m - 1, :],
             rectified_signal[m, :],
             myu_t * online_peak_power[m - 1, :])
 
     return temporal_masked_signal
+
 
 def switch_excitation_or_non_excitation(temporal_masked_signal,
                                         floor_level, lower_envelope,
@@ -61,7 +62,7 @@ def switch_excitation_or_non_excitation(temporal_masked_signal,
 
 def weight_smoothing(final_output, medium_time_power, N=4, L=128):
 
-    spectral_weight_smoothing = np.zeros_like(final_output)
+  spectral_weight_smoothing = np.zeros_like(final_output)
 	for m in range(final_output.shape[0]):
 		for l in range(final_output.shape[1]):
 			l_1 = max(l - N, 1)
@@ -69,7 +70,9 @@ def weight_smoothing(final_output, medium_time_power, N=4, L=128):
 	        spectral_weight_smoothing[m, l] = (1/float(l_2 - l_1 + 1)) * \
 	            sum([(final_output[m, l_] / medium_time_power[m, l_])\
 			     for l_ in range(l_1, l_2)])
+
     return spectral_weight_smoothing
+
 
 def time_frequency_normalization(power_stft_signal,
                                  spectral_weight_smoothing):
@@ -96,7 +99,6 @@ def power_function_nonlinearity(normalized_power, n=15):
 
 def pncc(audio_wave, n_fft=512, sr=16000, winlen=0.020, winstep=0.010,
          n_mels=128, n_pncc=13, weight_N=4, power=2):
-
 
     pre_emphasis_signal = scipy.signal.lfilter([1.0, -0.97], 1, audio_wave)
     mono_wave = to_mono(pre_emphasis_signal.T)
@@ -139,6 +141,7 @@ def pncc(audio_wave, n_fft=512, sr=16000, winlen=0.020, winstep=0.010,
 
     power_law_nonlinearity = power_function_nonlinearity(normalized_power)
 
-    dct = np.dot(power_law_nonlinearity, filters.dct(n_pncc, power_law_nonlinearity.shape[1]).T)
+    dct = np.dot(power_law_nonlinearity, filters.dct(
+        n_pncc, power_law_nonlinearity.shape[1]).T)
 
     return dct
