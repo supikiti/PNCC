@@ -61,15 +61,14 @@ def switch_excitation_or_non_excitation(temporal_masked_signal,
 
 
 def weight_smoothing(final_output, medium_time_power, N=4, L=128):
-
-  spectral_weight_smoothing = np.zeros_like(final_output)
-	for m in range(final_output.shape[0]):
-		for l in range(final_output.shape[1]):
-			l_1 = max(l - N, 1)
-			l_2 = min(l + N, L)
-	        spectral_weight_smoothing[m, l] = (1/float(l_2 - l_1 + 1)) * \
-	            sum([(final_output[m, l_] / medium_time_power[m, l_])
-			     for l_ in range(l_1, l_2)])
+    spectral_weight_smoothing = np.zeros_like(final_output)
+        for m in range(final_output.shape[0]):
+            for l in range(final_output.shape[1]):
+                l_1 = max(l - N, 1)
+                l_2 = min(l + N, L)
+		spectral_weight_smoothing[m, l] = (1/float(l_2 - l_1 + 1)) * \
+                      sum([(final_output[m, l_] / medium_time_power[m, l_])
+                      for l_ in range(l_1, l_2)])
 
     return spectral_weight_smoothing
 
