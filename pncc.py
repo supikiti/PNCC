@@ -10,7 +10,7 @@ def medium_time_power_calculation(power_stft_signal, M=2):
     medium_time_power = np.zeros_like(power_stft_signal)
     power_stft_signal = np.pad(power_stft_signal, [(M, M), (0, 0)], 'constant')
     for i in range(medium_time_power.shape[0]):
-        medium_time_power[i, :] = sum([1 / (2 * M + 1) *
+        medium_time_power[i, :] = sum([1 / float(2 * M + 1) *
                                        power_stft_signal[i + k - M, :]
                                        for k in range(2 * M + 1)])
     return medium_time_power
@@ -66,7 +66,7 @@ def weight_smoothing(final_output, medium_time_power, N=4, L=128):
 		for l in range(final_output.shape[1]):
 			l_1 = max(l - N, 1)
 			l_2 = min(l + N, L)
-	        spectral_weight_smoothing[m, l] = (1/(l_2 - l_1 + 1)) * \
+	        spectral_weight_smoothing[m, l] = (1/float(l_2 - l_1 + 1)) * \
 	            sum([(final_output[m, l_] / medium_time_power[m, l_])\
 			     for l_ in range(l_1, l_2)])
     return spectral_weight_smoothing
@@ -91,7 +91,7 @@ def mean_power_normalization(transfer_function,
 
 
 def power_function_nonlinearity(normalized_power, n=15):
-    return normalized_power ** (1 / n)
+    return normalized_power ** float(1 / n)
 
 
 def pncc(audio_wave, n_fft=512, sr=16000, winlen=0.020, winstep=0.010,
